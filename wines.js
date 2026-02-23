@@ -1,5 +1,5 @@
 const wineDatabase = {
-  "Россия": [
+  "Russia": [
     {
       id: 1,
       name: "Макитра Красное (Сухое)",
@@ -64,7 +64,7 @@ const wineDatabase = {
       acid: 4, sweet: 1, tannin: 1
     }
   ],
-  "Италия": [
+  "Italy": [
     {
       id: 8,
       name: "Ламбруско дель'Эмилия Бьянко",
@@ -129,7 +129,7 @@ const wineDatabase = {
       acid: 4, sweet: 2, tannin: 2
     }
   ],
-  "Германия": [
+  "Germany": [
     {
       id: 15,
       name: "Рислинг Зект Ханс Баер",
@@ -158,7 +158,7 @@ const wineDatabase = {
       acid: 3, sweet: 3, tannin: 1
     }
   ],
-  "Грузия": [
+  "Georgia": [
     {
       id: 18,
       name: "Мамико Саперави",
@@ -241,7 +241,7 @@ const wineDatabase = {
       acid: 4, sweet: 1, tannin: 1
     }
   ],
-  "Испания": [
+  "Spain": [
     {
       id: 27,
       name: "Кава Дос Капричос",
@@ -288,7 +288,7 @@ const wineDatabase = {
       acid: 3, sweet: 1, tannin: 3
     }
   ],
-  "Аргентина": [
+  "Argentina": [
     {
       id: 32,
       name: "Демонс энд Энджелс Мальбек",
@@ -299,7 +299,7 @@ const wineDatabase = {
       acid: 3, sweet: 1, tannin: 4
     }
   ],
-  "Австралия": [
+  "Australia": [
     {
       id: 33,
       name: "Олд Бин Трак Каберне Совиньон",
@@ -310,7 +310,7 @@ const wineDatabase = {
       acid: 3, sweet: 1, tannin: 5
     }
   ],
-  "Чили": [
+  "Chili": [
     {
       id: 34,
       name: "Санта Каролина Совиньон Блан",
@@ -321,7 +321,7 @@ const wineDatabase = {
       acid: 4, sweet: 1, tannin: 1
     }
   ],
-  "Австрия": [
+  "Austria": [
     {
       id: 35,
       name: "Шлосс Бокфлисс Адель",
@@ -332,7 +332,7 @@ const wineDatabase = {
       acid: 4, sweet: 1, tannin: 1
     }
   ],
-  "Армения": [
+  "Armenia": [
     {
       id: 36,
       name: "Хоги Гранатовое",
@@ -353,3 +353,4 @@ const wineDatabase = {
     }
   ]
 };
+
