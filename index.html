@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wine Map Premium</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        :root {
+            --bg-glass: rgba(255, 255, 255, 0.9);
+            --text-main: #1a1a1a;
+            --accent: #800020;
+            --accent-soft: rgba(128, 0, 32, 0.1);
+            --radius: 28px;
+            --wine-red: #800020;
+            --wine-white: #e6c200;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-glass: rgba(28, 28, 30, 0.95);
+                --text-main: #ffffff;
+                --accent: #ff4d6d;
+            }
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #000; overflow: hidden; }
+        #map { height: 100%; width: 100%; z-index: 1; }
+
+        /* Панель поиска */
+        .header-panel { position: fixed; top: 15px; left: 15px; right: 15px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
+        .search-input { width: 100%; padding: 15px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.2); background: var(--bg-glass); backdrop-filter: blur(15px); color: var(--text-main); font-size: 16px; outline: none; box-sizing: border-box; }
+        .filters-container { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+        .filter-btn { white-space: nowrap; padding: 8px 16px; border-radius: 20px; background: var(--bg-glass); color: var(--text-main); font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
+        .filter-btn.active { background: var(--accent); color: white; }
+
+        /* Шторка */
+        .sheet { position: fixed; bottom: -110%; left: 0; right: 0; background: var(--bg-glass); backdrop-filter: blur(25px); border-radius: var(--radius) var(--radius) 0 0; z-index: 1500; transition: bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1); max-height: 85vh; display: flex; flex-direction: column; }
+        .sheet.active { bottom: 0; }
+        .sheet.touching { transition: none !important; }
+        .sheet-header { padding: 15px; cursor: grab; }
+        .sheet-handle { width: 40px; height: 5px; background: rgba(0,0,0,0.1); border-radius: 10px; margin: 0 auto; }
+        .sheet-content { overflow-y: auto; padding: 0 20px 40px; }
+
+        /* Карточка вина */
+        .wine-card { display: flex; align-items: center; background: rgba(0,0,0,0.03); border-radius: 18px; padding: 12px; margin-top: 10px; cursor: pointer; border-left: 5px solid var(--accent); }
+        .wine-thumb { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 15px; }
+        .wine-info h3 { margin: 0; font-size: 16px; color: var(--text-main); }
+        .tag { display: inline-block; padding: 3px 8px; background: var(--accent-soft); color: var(--accent); border-radius: 6px; font-size: 11px; margin-top: 5px; margin-right: 4px; font-weight: 600; }
+
+        /* Шкалы */
+        .characteristics { margin: 15px 0; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 18px; }
+        .char-item { display: flex; align-items: center; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: var(--text-main); }
+        .scale-dots { display: flex; gap: 4px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--accent); }
+        .dot.filled { background: var(--accent); }
+
+        /* Развертывание текста */
+        .desc-text { font-size: 15px; line-height: 1.5; color: var(--text-main); opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .desc-text.expanded { -webkit-line-clamp: unset; }
+        .expand-btn { background: none; border: none; color: var(--accent); font-weight: bold; padding: 8px 0; cursor: pointer; font-size: 14px; display: none; align-items: center; gap: 5px; }
+
+        .detail-img { width: 100%; border-radius: 20px; margin-bottom: 15px; max-height: 250px; object-fit: cover; }
+        .leaflet-control-attribution { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="header-panel">
+        <input type="text" id="global-search" class="search-input" placeholder="Поиск вина, сорта или еды..." oninput="handleSearch()">
+        <div class="filters-container">
+            <button class="filter-btn" onclick="toggleFilter(this, 'красное')">🍷 Красное</button>
+            <button class="filter-btn" onclick="toggleFilter(this, 'белое')">🥂 Белое</button>
+            <button class="filter-btn" onclick="toggleFilter(this, 'игристое')">🍾 Игристое</button>
+            <button class="filter-btn" onclick="toggleFilter(this, 'сухое')">Сухое</button>
+            <button class="filter-btn" onclick="toggleFilter(this, 'полусладкое')">П/сл</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="list-sheet" class="sheet">
+        <div class="sheet-header"><div class="sheet-handle"></div><h2 id="list-title" style="text-align:center; color:var(--text-main); margin: 10px 0;">Вина</h2></div>
+        <div class="sheet-content" id="list-container"></div>
+    </div>
+
+    <div id="detail-sheet" class="sheet">
+        <div class="sheet-header"><div class="sheet-handle"></div></div>
+        <div class="sheet-content">
+            <img id="detail-img" class="detail-img">
+            <h2 id="detail-name" style="margin:0; color:var(--text-main)"></h2>
+            <div id="detail-tags"></div>
+            
+            <div class="characteristics" id="char-container"></div>
+            
+            <div id="desc-node" class="desc-text"></div>
+            <button id="expand-trigger" class="expand-btn">Читать далее ▼</button>
+            
+            <button class="btn-close" style="width:100%; padding:18px; border-radius:18px; background:var(--accent); color:white; border:none; font-weight:bold; margin-top:20px;" onclick="closeSheet('detail-sheet')">Вернуться к карте</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="wines.js"></script>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const map = L.map('map', { zoomControl: false }).setView([45, 15], 3);
+        L.tileLayer(tg.colorScheme === 'dark' 
+            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        let currentMarker = null;
+
+        // Загрузка стран
+        fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
+            .then(res => res.json())
+            .then(data => {
+                L.geoJson(data, {
+                    style: f => ({
+                        fillColor: wineDatabase[f.properties.name] ? '#800020' : '#888',
+                        weight: 1, color: 'white', fillOpacity: 0.4
+                    }),
+                    onEachFeature: (f, l) => {
+                        if (wineDatabase[f.properties.name]) {
+                            l.on('click', (e) => {
+                                tg.HapticFeedback.impactOccurred('light');
+                                map.fitBounds(e.target.getBounds(), { padding: [50, 50] });
+                                openCountryList(f.properties.name);
+                            });
+                        }
+                    }
+                }).addTo(map);
+            });
+
+        // Жесты закрытия
+        let startY = 0;
+        document.querySelectorAll('.sheet').forEach(sheet => {
+            sheet.addEventListener('touchstart', e => { startY = e.touches[0].clientY; sheet.classList.add('touching'); });
+            sheet.addEventListener('touchmove', e => {
+                let delta = e.touches[0].clientY - startY;
+                if (delta > 0) sheet.style.transform = `translateY(${delta}px)`;
+            });
+            sheet.addEventListener('touchend', e => {
+                sheet.classList.remove('touching');
+                let delta = e.changedTouches[0].clientY - startY;
+                if (delta > 100) closeSheet(sheet.id);
+                else sheet.style.transform = '';
+            });
+        });
+
+        function showDetail(wine) {
+            document.getElementById('list-sheet').classList.remove('active');
+            
+            const img = document.getElementById('detail-img');
+            img.src = wine.image;
+            document.getElementById('detail-name').innerText = wine.name;
+            document.getElementById('detail-tags').innerHTML = wine.tags.map(t => `<span class="tag">${t}</span>`).join('');
+            
+            // Шкалы
+            const charBox = document.getElementById('char-container');
+            const labels = { acid: 'Кислотность', sweet: 'Сладость', tannin: 'Танинность' };
+            charBox.innerHTML = '';
+            let hasChars = false;
+            ['acid', 'sweet', 'tannin'].forEach(key => {
+                if (wine[key]) {
+                    hasChars = true;
+                    charBox.innerHTML += `
+                        <div class="char-item">
+                            <span>${labels[key]}</span>
+                            <div class="scale-dots">${[1,2,3,4,5].map(i => `<div class="dot ${i <= wine[key] ? 'filled' : ''}"></div>`).join('')}</div>
+                        </div>`;
+                }
+            });
+            charBox.style.display = hasChars ? 'block' : 'none';
+
+            // Текст
+            const textNode = document.getElementById('desc-node');
+            const btn = document.getElementById('expand-trigger');
+            textNode.innerText = wine.desc;
+            textNode.classList.remove('expanded');
+            btn.style.display = 'none';
+
+            setTimeout(() => {
+                if (textNode.scrollHeight > textNode.clientHeight) {
+                    btn.style.display = 'flex';
+                    btn.onclick = () => { textNode.classList.toggle('expanded'); btn.innerText = textNode.classList.contains('expanded') ? 'Скрыть ▲' : 'Читать далее ▼'; };
+                }
+            }, 200);
+
+            document.getElementById('detail-sheet').classList.add('active');
+            document.getElementById('detail-sheet').style.transform = '';
+
+            // Точка на карте
+            if (currentMarker) map.removeLayer(currentMarker);
+            currentMarker = L.circleMarker(wine.coords, {
+                radius: 12, fillColor: "#ff4d6d", color: "white", weight: 3, fillOpacity: 1
+            }).addTo(map);
+            map.flyTo(wine.coords, 10, { duration: 1.5 });
+        }
+
+        function openCountryList(country) {
+            const wines = wineDatabase[country];
+            document.getElementById('list-title').innerText = country;
+            renderList(wines.map(w => ({ ...w, countryName: country })));
+            document.getElementById('list-sheet').classList.add('active');
+            document.getElementById('list-sheet').style.transform = '';
+        }
+
+        function renderList(items) {
+            const container = document.getElementById('list-container');
+            container.innerHTML = items.map(wine => `
+                <div class="wine-card" onclick='showDetail(${JSON.stringify(wine)})'>
+                    <img src="${wine.image}" class="wine-thumb">
+                    <div class="wine-info">
+                        <h3>${wine.name}</h3>
+                        <div class="wine-meta" style="font-size:12px; opacity:0.6">${wine.countryName}</div>
+                        <div>${wine.tags.slice(0,2).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function handleSearch() {
+            const q = document.getElementById('global-search').value.toLowerCase();
+            if (q.length < 2) return;
+            let results = [];
+            for (let c in wineDatabase) {
+                wineDatabase[c].forEach(w => {
+                    if (`${w.name} ${w.desc} ${w.tags.join(' ')}`.toLowerCase().includes(q)) {
+                        results.push({ ...w, countryName: c });
+                    }
+                });
+            }
+            renderList(results);
+            document.getElementById('list-sheet').classList.add('active');
+        }
+
+        function toggleFilter(btn, f) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('global-search').value = f;
+            handleSearch();
+        }
+
+        function closeSheet(id) {
+            document.getElementById(id).classList.remove('active');
+            document.getElementById(id).style.transform = '';
+            if (id === 'detail-sheet' && currentMarker) map.removeLayer(currentMarker);
+            tg.HapticFeedback.impactOccurred('medium');
+        }
+    </script>
+</body>
+</html>
