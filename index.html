@@ -1,624 +1,743 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="icon" href="https://static.tildacdn.com/tild6435-3530-4633-a232-383431366539/Vector.svg" type="image/x-icon">
+<title>Винная Карта ЮГ</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+:root {
+--primary: #722F37;
+--primary-light: #9e4650;
+--bg-color: #f8f9fa;
+--card-bg: #ffffff;
+--text-main: #2c3e50;
+--text-sec: #7f8c8d;
+--shadow: 0 4px 20px rgba(0,0,0,0.1);
+--radius: 16px;
+--transition: all 0.3s ease;
+--header-height: 70px;
+}
+[data-theme="dark"] {
+--bg-color: #121212;
+--card-bg: #1e1e1e;
+--text-main: #ecf0f1;
+--text-sec: #bdc3c7;
+--shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+body { background-color: var(--bg-color); color: var(--text-main); transition: var(--transition); overflow: hidden; }
+
+/* HEADER */
+header {
+position: fixed; top: 0; left: 0; right: 0;
+background: rgba(255, 255, 255, 0.95);
+backdrop-filter: blur(10px);
+z-index: 1000;
+padding: 10px 16px;
+display: flex; justify-content: space-between; align-items: center;
+border-bottom: 1px solid rgba(0,0,0,0.05);
+height: var(--header-height);
+}
+[data-theme="dark"] header { background: rgba(30, 30, 30, 0.95); border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+.logo { 
+font-size: 1.1rem; font-weight: 700; color: var(--primary); 
+display: flex; align-items: center; gap: 10px; 
+max-width: 60%;
+}
+.logo-img { 
+    height: 32px; 
+    width: auto;
+    /* Логика цвета логотипа: по умолчанию черный (для светлой темы) */
+    filter: brightness(0); 
+    transition: var(--transition);
+}
+[data-theme="dark"] .logo-img {
+    /* На темной теме инвертируем в белый */
+    filter: brightness(0) invert(1); 
+}
+
+.header-actions { display: flex; gap: 10px; align-items: center; }
+
+/* SEARCH */
+.search-container {
+flex: 1;
+margin: 0 10px;
+position: relative;
+max-width: 400px;
+}
+.search-input {
+width: 100%;
+padding: 10px 15px 10px 40px;
+border-radius: 20px;
+border: 1px solid rgba(0,0,0,0.1);
+background: var(--bg-color);
+color: var(--text-main);
+font-size: 0.9rem;
+outline: none;
+transition: var(--transition);
+}
+[data-theme="dark"] .search-input { border-color: rgba(255,255,255,0.1); }
+.search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(114, 47, 55, 0.2); }
+.search-icon {
+position: absolute; left: 12px; top: 50%;
+transform: translateY(-50%);
+color: var(--text-sec);
+font-size: 0.9rem;
+}
+
+.btn-theme {
+width: 40px; height: 40px;
+border-radius: 12px;
+background: var(--card-bg);
+border: 1px solid rgba(0,0,0,0.05);
+color: var(--text-main);
+display: flex; align-items: center; justify-content: center;
+cursor: pointer;
+transition: var(--transition);
+flex-shrink: 0;
+/* Красивая тень */
+box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.btn-theme:active { transform: scale(0.95); }
+.btn-theme i { font-size: 1.1rem; }
+
+/* MAP */
+#map { width: 100%; height: 100vh; z-index: 1; }
+
+/* CUSTOM ZOOM BUTTONS */
+.leaflet-control-zoom {
+border: none !important;
+box-shadow: none !important;
+}
+.leaflet-control-zoom a {
+background: var(--card-bg) !important;
+color: var(--text-main) !important;
+border: 1px solid rgba(0,0,0,0.05) !important;
+width: 36px !important;
+height: 36px !important;
+line-height: 36px !important;
+font-weight: bold !important;
+font-size: 18px !important;
+border-radius: 8px !important;
+margin-bottom: 8px !important;
+box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important;
+transition: var(--transition) !important;
+}
+.leaflet-control-zoom a:hover {
+background: var(--primary) !important;
+color: white !important;
+}
+.leaflet-touch .leaflet-control-zoom a {
+line-height: 34px !important;
+}
+
+/* BOTTOM SHEET */
+.bottom-sheet {
+position: fixed;
+bottom: 0; left: 0; right: 0;
+background: var(--card-bg);
+border-radius: 24px 24px 0 0;
+box-shadow: 0 -4px 30px rgba(0,0,0,0.15);
+z-index: 1001;
+transform: translateY(100%);
+transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+max-height: 85vh;
+display: flex;
+flex-direction: column;
+}
+.bottom-sheet.active { transform: translateY(0); }
+.sheet-handle {
+width: 40px; height: 5px;
+background: rgba(0,0,0,0.2);
+border-radius: 3px;
+margin: 12px auto;
+cursor: grab;
+touch-action: none;
+}
+[data-theme="dark"] .sheet-handle { background: rgba(255,255,255,0.3); }
+.sheet-header {
+padding: 0 20px 15px;
+display: flex; justify-content: space-between; align-items: center;
+border-bottom: 1px solid rgba(0,0,0,0.05);
+flex-shrink: 0;
+}
+[data-theme="dark"] .sheet-header { border-bottom: 1px solid rgba(255,255,255,0.05); }
+.sheet-title { font-size: 1.4rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.sheet-count { background: var(--primary); color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; }
+.sheet-close {
+width: 36px; height: 36px;
+border-radius: 50%;
+background: rgba(0,0,0,0.05);
+border: none;
+color: var(--text-main);
+font-size: 1.2rem;
+cursor: pointer;
+display: flex; align-items: center; justify-content: center;
+}
+[data-theme="dark"] .sheet-close { background: rgba(255,255,255,0.1); }
+.sheet-content {
+flex: 1;
+overflow-y: auto;
+padding: 20px;
+-webkit-overflow-scrolling: touch;
+}
+
+/* WINE CARD */
+.wine-card {
+background: var(--bg-color);
+border-radius: var(--radius);
+padding: 16px;
+margin-bottom: 16px;
+display: flex;
+gap: 16px;
+cursor: pointer;
+transition: var(--transition);
+}
+.wine-card:active { transform: scale(0.98); }
+.wine-card img {
+width: 100px; height: 100px;
+object-fit:contain;
+background: rgb(255, 255, 255);
+border-radius: 12px;
+flex-shrink: 0;
+}
+.wine-card-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.wine-card-info h3 { font-size: 1rem; margin-bottom: 6px; line-height: 1.3; }
+.wine-card-info p { font-size: 0.85rem; color: var(--text-sec); margin-bottom: 8px; }
+.wine-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.wine-tag {
+font-size: 0.7rem; padding: 3px 8px;
+background: rgba(114, 47, 55, 0.1);
+color: var(--primary);
+border-radius: 4px;
+}
+
+/* WINE DETAIL MODAL */
+.detail-modal {
+position: fixed;
+top: 0; left: 0; width: 100%; height: 100%;
+background: var(--bg-color);
+z-index: 1002;
+transform: translateX(100%);
+transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+overflow-y: auto;
+-webkit-overflow-scrolling: touch;
+}
+.detail-modal.active { transform: translateX(0); }
+.detail-header {
+position: relative;
+height: 280px;
+display: flex;
+align-items: center;
+justify-content: center;
+background: rgb(255, 255, 255);
+}
+.detail-header img {
+width: auto; height: 100%;
+object-fit: cover;
+display: flex;
+justify-content: center;
+align-items: center;
+}
+.detail-back {
+position: absolute;
+top: 16px; left: 16px;
+width: 44px; height: 44px;
+border-radius: 50%;
+background: rgba(255,255,255,0.9);
+border: none;
+font-size: 1.2rem;
+cursor: pointer;
+display: flex; align-items: center; justify-content: center;
+box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+.detail-content { padding: 24px 20px; }
+.detail-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; color: var(--primary); }
+.detail-region { font-size: 0.95rem; color: var(--text-sec); margin-bottom: 20px; display: flex; align-items: center; gap: 6px; }
+.detail-specs {
+display: grid;
+grid-template-columns: repeat(2, 1fr);
+gap: 12px;
+margin-bottom: 24px;
+}
+.spec-box {
+background: var(--card-bg);
+padding: 14px;
+border-radius: 12px;
+text-align: center;
+}
+.spec-label { font-size: 0.75rem; color: var(--text-sec); margin-bottom: 4px; }
+.spec-value { font-size: 1rem; font-weight: 600; }
+.detail-section { margin-bottom: 24px; }
+.section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.detail-desc { font-size: 0.95rem; line-height: 1.6; color: var(--text-main); }
+.detail-pairing {
+background: rgba(114, 47, 55, 0.05);
+padding: 16px;
+border-radius: 12px;
+font-size: 0.95rem;
+line-height: 1.6;
+}
+.profile-bars { margin-bottom: 24px; }
+.profile-row { margin-bottom: 14px; }
+.profile-row-header { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px; font-weight: 500; }
+.profile-bar-bg { height: 8px; background: rgba(0,0,0,0.1); border-radius: 4px; overflow: hidden; }
+.profile-bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease-out; }
+.fill-acid { background: linear-gradient(90deg, #f1c40f, #f39c12); }
+.fill-sweet { background: linear-gradient(90deg, #e91e63, #c2185b); }
+.fill-tannin { background: linear-gradient(90deg, #8e44ad, #6c3483); }
+
+/* SHARE SECTION IMPROVED */
+.share-section {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 10px;
+padding-top: 20px;
+border-top: 1px solid rgba(0,0,0,0.05);
+}
+[data-theme="dark"] .share-section { border-top: 1px solid rgba(255,255,255,0.05); }
+.share-btn {
+height: 50px;
+border-radius: 12px;
+border: none;
+color: white;
+font-size: 1.5rem;
+cursor: pointer;
+display: flex; align-items: center; justify-content: center;
+transition: var(--transition);
+box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+.share-btn:active { transform: scale(0.95); }
+.share-tg { background: linear-gradient(135deg, #0088cc, #0066aa); }
+.share-wa { background: linear-gradient(135deg, #25D366, #128C7E); }
+.share-vk { background: linear-gradient(135deg, #0077FF, #0055cc); }
+
+/* FILTERS */
+.filters {
+position: fixed;
+top: var(--header-height); left: 0; right: 0;
+background: var(--card-bg);
+padding: 12px 16px;
+z-index: 999;
+display: flex;
+gap: 8px;
+overflow-x: auto;
+-webkit-overflow-scrolling: touch;
+border-bottom: 1px solid rgba(0,0,0,0.05);
+transform: translateY(-100%);
+transition: transform 0.3s ease;
+}
+[data-theme="dark"] .filters { border-bottom: 1px solid rgba(255,255,255,0.05); }
+.filters.active { transform: translateY(0); }
+.filter-chip {
+padding: 8px 16px;
+border-radius: 20px;
+background: var(--bg-color);
+border: 1px solid rgba(0,0,0,0.1);
+color: var(--text-main);
+font-size: 0.85rem;
+white-space: nowrap;
+cursor: pointer;
+transition: var(--transition);
+}
+.filter-chip.active {
+background: var(--primary);
+color: white;
+border-color: var(--primary);
+}
+
+/* COUNTRY HINT */
+.country-hint {
+position: fixed;
+bottom: 20px; left: 50%;
+transform: translateX(-50%);
+background: rgba(0,0,0,0.8);
+color: white;
+padding: 10px 20px;
+border-radius: 25px;
+font-size: 0.9rem;
+z-index: 998;
+opacity: 0;
+transition: opacity 0.3s ease;
+pointer-events: none;
+}
+.country-hint.show { opacity: 1; }
+
+/* LOADING */
+.loading {
+position: fixed;
+top: 0; left: 0; width: 100%; height: 100%;
+background: var(--bg-color);
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+z-index: 2000;
+transition: opacity 0.5s ease;
+}
+.loading.hidden { opacity: 0; pointer-events: none; }
+.loading-icon { font-size: 3rem; color: var(--primary); margin-bottom: 20px; animation: pulse 1.5s infinite; }
+.loading-text { font-size: 1.1rem; color: var(--text-sec); }
+@keyframes pulse {
+0%, 100% { transform: scale(1); opacity: 1; }
+50% { transform: scale(1.1); opacity: 0.7; }
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 2px; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
+</style>
+</head>
+<body data-theme="dark">
+<!-- LOADING -->
+<div class="loading" id="loading">
+<div class="loading-icon"><i class="fas fa-wine-glass-alt"></i></div>
+<div class="loading-text">Загрузка карты...</div>
+</div>
+
+<!-- HEADER -->
+<header>
+<div class="logo">
+<img src="https://static.tildacdn.com/tild6435-3530-4633-a232-383431366539/Vector.svg" alt="Logo" class="logo-img">
+<span></span>
+</div>
+<div class="search-container">
+<i class="fas fa-search search-icon"></i>
+<input type="text" class="search-input" id="searchInput" placeholder="Поиск вина...">
+</div>
+<div class="header-actions">
+<button class="btn-theme" id="themeToggle">
+<i class="fas fa-sun"></i>
+</button>
+</div>
+</header>
+
+<!-- FILTERS -->
+<div class="filters" id="filters">
+<div class="filter-chip active" data-filter="all">Все</div>
+<div class="filter-chip" data-filter="красное">🍷 Красное</div>
+<div class="filter-chip" data-filter="белое">🥂 Белое</div>
+<div class="filter-chip" data-filter="игристое">🍾 Игристое</div>
+<div class="filter-chip" data-filter="сухое">Сухое</div>
+<div class="filter-chip" data-filter="полусладкое">П/сл</div>
+</div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- COUNTRY HINT -->
+<div class="country-hint" id="countryHint">
+<i class="fas fa-hand-pointer"></i> Нажмите на страну
+</div>
+
+<!-- BOTTOM SHEET -->
+<div class="bottom-sheet" id="bottomSheet">
+<div class="sheet-handle" id="sheetHandle"></div>
+<div class="sheet-header">
+<div class="sheet-title">
+<span id="sheetCountryFlag">🇷🇺</span>
+<span id="sheetCountryName">Россия</span>
+</div>
+<span class="sheet-count" id="sheetCount">0 вин</span>
+<button class="sheet-close" id="sheetClose">
+<i class="fas fa-times"></i>
+</button>
+</div>
+<div class="sheet-content" id="sheetContent">
+<!-- Wine cards will be inserted here -->
+</div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="detail-modal" id="detailModal">
+<div class="detail-header">
+<img src="" alt="" id="detailImg">
+<button class="detail-back" id="detailBack">
+<i class="fas fa-arrow-left"></i>
+</button>
+</div>
+<div class="detail-content">
+<h1 class="detail-title" id="detailTitle"></h1>
+<div class="detail-region" id="detailRegion"></div>
+<div class="detail-specs">
+<div class="spec-box">
+<div class="spec-label"><i class="fas fa-grapes"></i> Сорт</div>
+<div class="spec-value" id="detailGrape"></div>
+</div>
+<div class="spec-box">
+<div class="spec-label"><i class="fas fa-percentage"></i> Крепость</div>
+<div class="spec-value" id="detailAbv"></div>
+</div>
+<div class="spec-box" style="grid-column: span 2;">
+<div class="spec-label"><i class="fas fa-wine-glass"></i> Тип</div>
+<div class="spec-value" id="detailType" style="color: var(--primary);"></div>
+</div>
+</div>
+<div class="detail-section">
+<div class="section-title"><i class="fas fa-info-circle"></i> Описание</div>
+<p class="detail-desc" id="detailDesc"></p>
+</div>
+<div class="detail-section">
+<div class="section-title"><i class="fas fa-utensils"></i> Сочетания</div>
+<div class="detail-pairing" id="detailPairing"></div>
+</div>
+<div class="detail-section">
+<div class="section-title"><i class="fas fa-chart-bar"></i> Вкусовой профиль</div>
+<div class="profile-bars">
+<div class="profile-row">
+<div class="profile-row-header">
+<span><i class="fas fa-lemon" style="color: #f1c40f;"></i> Кислотность</span>
+<span id="valAcid"></span>
+</div>
+<div class="profile-bar-bg">
+<div class="profile-bar-fill fill-acid" id="barAcid"></div>
+</div>
+</div>
+<div class="profile-row">
+<div class="profile-row-header">
+<span><i class="fas fa-candy-cane" style="color: #e91e63;"></i> Сладость</span>
+<span id="valSweet"></span>
+</div>
+<div class="profile-bar-bg">
+<div class="profile-bar-fill fill-sweet" id="barSweet"></div>
+</div>
+</div>
+<div class="profile-row">
+<div class="profile-row-header">
+<span><i class="fas fa-wine-bottle" style="color: #8e44ad;"></i> Танинность</span>
+<span id="valTannin"></span>
+</div>
+<div class="profile-bar-bg">
+<div class="profile-bar-fill fill-tannin" id="barTannin"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="detail-section">
+<div class="section-title"><i class="fas fa-share-alt"></i> Поделиться</div>
+<div class="share-section">
+<button class="share-btn share-tg" id="shareTg">
+<i class="fab fa-telegram-plane"></i>
+</button>
+<button class="share-btn share-wa" id="shareWa">
+<i class="fab fa-whatsapp"></i>
+</button>
+<button class="share-btn share-vk" id="shareVk">
+<i class="fab fa-vk"></i>
+</button>
+</div>
+</div>
+</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-// === TELEGRAM WEB APP ===
+
 const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-// === КОНФИГУРАЦИЯ ===
-const SHEET_ID = '158E5Bv70FryY6MFPADvtXAaDgndIvzWgCkTXC8IhmnQ';
-const GVIZ_URL = 'https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}';
-
-// === ИСПРАВЛЕННЫЙ CSV ПАРСЕР ===
-// Правильно обрабатывает кавычки, запятые внутри текста и переносы строк
-function parseCSV(text) {
-    const rows = [];
-    let currentRow = [];
-    let currentCell = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        const nextChar = text[i + 1];
-        
-        if (inQuotes) {
-            if (char === '"') {
-                if (nextChar === '"') {
-                    // Экранированная кавычка ""
-                    currentCell += '"';
-                    i++;
-                } else {
-                    // Конец цитирования
-                    inQuotes = false;
-                }
-            } else {
-                currentCell += char;
-            }
-        } else {
-            if (char === '"') {
-                // Начало цитирования
-                inQuotes = true;
-            } else if (char === ',') {
-                // Конец ячейки
-                currentRow.push(currentCell.trim());
-                currentCell = '';
-            } else if (char === '\n') {
-                // Конец строки
-                currentRow.push(currentCell.trim());
-                if (currentRow.length > 0 && currentRow.some(c => c !== '')) {
-                    rows.push(currentRow);
-                }
-                currentRow = [];
-                currentCell = '';
-            } else if (char !== '\r') {
-                currentCell += char;
-            }
-        }
-    }
-    
-    // Последняя ячейка
-    if (currentCell || currentRow.length > 0) {
-        currentRow.push(currentCell.trim());
-        if (currentRow.some(c => c !== '')) {
-            rows.push(currentRow);
-        }
-    }
-    
-    // Преобразуем в объекты
-    if (rows.length < 2) return [];
-    const headers = rows[0].map(h => h.toLowerCase().replace(/[^a-z0-9]/g, '_'));
-    
-    return rows.slice(1).map(row => {
-        const obj = {};
-        headers.forEach((h, i) => {
-            obj[h] = row[i] || '';
-        });
-        return obj;
-    });
+// === БАЗА ДАННЫХ ===
+const wineDatabase = {
+"Россия": {
+flag: "🇷🇺",
+coords: [[44.894, 37.316], [44.895, 37.317], [44.896, 37.318], [44.897, 37.319], [44.724, 37.591], [44.500, 34.200], [45.200, 36.800]],
+wines: [
+{ id: 1, name: "Макитра Красное (Сухое)", region: "Краснодарский край", grape: "Каберне Совиньон", abv: "12-14%", desc: "Яркие танины, черная смородина, специи. Идеально подходит к жареному мясу, выдержанным сырам и хачапури.", pairing: "Жареное мясо, сыры, хачапури", image: "https://images.unsplash.com/photo-1559563362-c667ba5f5480?w=600", tags: ["красное", "сухое"], acid: 3, sweet: 1, tannin: 5 },
+{ id: 2, name: "Макитра Красное (П/сл)", region: "Краснодарский край", grape: "Каберне Совиньон", abv: "12%", desc: "Мягкое, ягодное, с нотами вишни и шелковицы. Прекрасно дополняет десерты и фрукты.", pairing: "Десерты, фрукты, орехи", image: "https://images.unsplash.com/photo-1585553616435-2dc0a54e271d?w=600", tags: ["красное", "полусладкое"], acid: 2, sweet: 4, tannin: 2 },
+{ id: 3, name: "Макитра Белое (Сухое)", region: "Краснодарский край", grape: "Совиньон Блан", abv: "10.6%", desc: "Свежее, с цитрусовыми и яблочными нотами. Отлично к рыбе и морепродуктам.", pairing: "Рыба, салаты, морепродукты", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "сухое"], acid: 4, sweet: 1, tannin: 1 },
+{ id: 4, name: "Макитра Белое (П/сл)", region: "Краснодарский край", grape: "Шардоне", abv: "12.5%", desc: "Медовые тона, груша, цветочные ноты. Легкое вино для приятного вечера.", pairing: "Легкие десерты, фрукты", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "полусладкое"], acid: 3, sweet: 4, tannin: 1 },
+{ id: 5, name: "Макитра Брют", region: "Краснодарский край", grape: "Траминер, Пино Блан, Алиготе", abv: "12.5%", desc: "Сухое, с зеленым яблоком и минеральностью. Идеальный аперитив.", pairing: "Аперитив, устрицы, сыры", image: "https://images.unsplash.com/photo-1598155523122-38423bb4d6c1?w=600", tags: ["игристое", "белое", "сухое"], acid: 5, sweet: 1, tannin: 1 },
+{ id: 6, name: "Мускат Эссе Оранж", region: "Крым", grape: "Мускат", abv: "12%", desc: "Оранжевое вино с медовыми и пряными нотами. Необычный вкус.", pairing: "Сыры, орехи", image: "https://images.unsplash.com/photo-1584916201218-f4242ceb4809?w=600", tags: ["оранжевое", "сухое"], acid: 3, sweet: 2, tannin: 3 },
+{ id: 7, name: "Флёр Дю Сюд Белое", region: "Тамань", grape: "Траминер Розовый", abv: "11.5%", desc: "Травы, крыжовник. Свежее и легкое.", pairing: "Салаты, рыба", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "сухое"], acid: 4, sweet: 1, tannin: 1 }
+]
+},
+"Италия": {
+flag: "🇮🇹",
+coords: [[44.500, 11.000], [45.750, 12.750], [44.700, 8.200], [43.518, 11.267], [45.500, 12.500], [45.400, 12.300]],
+wines: [
+{ id: 8, name: "Ламбруско дель'Эмилия", region: "Эмилия-Романья", grape: "Ламбруско", abv: "8%", desc: "Полусладкое игристое. Легкое, с нотами яблока и персика.", pairing: "Десерты, фрукты, паста", image: "https://images.unsplash.com/photo-1598155523122-38423bb4d6c1?w=600", tags: ["игристое", "красное", "полусладкое"], acid: 3, sweet: 4, tannin: 1 },
+{ id: 9, name: "Просекко Розе Брют", region: "Венето", grape: "Глера, Пино Нуар", abv: "10.5%", desc: "Клубника, малина, свежесть. Элегантное игристое.", pairing: "Морепродукты, десерты", image: "https://images.unsplash.com/photo-1598155523122-38423bb4d6c1?w=600", tags: ["игристое", "розовое", "сухое"], acid: 4, sweet: 1, tannin: 1 },
+{ id: 10, name: "Мартини Асти", region: "Пьемонт", grape: "Мускат", abv: "7.5%", desc: "Сладкое игристое. Мед, персик, цветы.", pairing: "Десерты, фрукты", image: "https://images.unsplash.com/photo-1598155523122-38423bb4d6c1?w=600", tags: ["игристое", "сладкое"], acid: 3, sweet: 5, tannin: 1 },
+{ id: 11, name: "Мартини Просекко", region: "Венето", grape: "Глера", abv: "11.5%", desc: "Зеленое яблоко, груша. Классическое просекко.", pairing: "Аперитив, легкие закуски", image: "https://images.unsplash.com/photo-1598155523122-38423bb4d6c1?w=600", tags: ["игристое", "сухое"], acid: 4, sweet: 1, tannin: 1 },
+{ id: 12, name: "Конти Серристори Кьянти", region: "Тоскана", grape: "Санджовезе, Канайоло, Колорино", abv: "13%", desc: "Вишня, табак, дуб. Тосканская классика.", pairing: "Паста, пицца, мясо", image: "https://images.unsplash.com/photo-1559563362-c667ba5f5480?w=600", tags: ["красное", "сухое"], acid: 4, sweet: 1, tannin: 4 },
+{ id: 13, name: "Пино Гриджио Чиело", region: "Венето", grape: "Пино Гриджио", abv: "12%", desc: "Груша, миндаль. Легкое и свежее.", pairing: "Легкие закуски, морепродукты", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "сухое"], acid: 4, sweet: 1, tannin: 1 },
+{ id: 14, name: "Фрискелло Розато", region: "Венеция", grape: "Рабозо, Мерло", abv: "10.5%", desc: "Клубника, малина. Игристое розовое.", pairing: "Аперитив, легкие закуски", image: "https://images.unsplash.com/photo-1584916201218-f4242ceb4809?w=600", tags: ["игристое", "розовое"], acid: 4, sweet: 2, tannin: 2 }
+]
+},
+"Германия": {
+flag: "🇩🇪",
+coords: [[49.816, 6.870], [49.900, 6.900], [49.700, 7.100]],
+wines: [
+{ id: 15, name: "Рислинг Зект Ханс Баер", region: "Мозель", grape: "Рислинг", abv: "12%", desc: "Сухое игристое. Минеральный, с цитрусами и грушей.", pairing: "Рыба, суши, морепродукты", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["игристое", "сухое"], acid: 5, sweet: 1, tannin: 1 },
+{ id: 16, name: "Рислинг Урбан Ник Вайс", region: "Мозель", grape: "Рислинг", abv: "12%", desc: "Полусухое. Яблоко, персик. Освежающий вкус.", pairing: "Рыба, паста, азиатская кухня", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "полусухое"], acid: 5, sweet: 3, tannin: 1 },
+{ id: 17, name: "Гевюрцтраминер", region: "Рейн", grape: "Гевюрцтраминер", abv: "12%", desc: "Роза, личи, специи. Ароматное вино.", pairing: "Азиатская кухня, сыры", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "полусухое"], acid: 3, sweet: 3, tannin: 1 }
+]
+},
+"Грузия": {
+flag: "🇬🇪",
+coords: [[41.920, 45.400], [42.100, 45.500], [42.000, 45.300], [41.950, 45.450], [42.500, 42.800], [41.900, 45.400]],
+wines: [
+{ id: 18, name: "Мамико Саперави", region: "Кахетия", grape: "Саперави", abv: "12.5%", desc: "Танинное, с вишней и специями. Мощное грузинское вино.", pairing: "Баранина, стейк, шашлык", image: "https://static.simplewine.ru/upload/iblock/cd4/cd4120e5668c2cdc5b878e6b9b5fe7f3.png@x604?fmt=webp", tags: ["красное", "сухое"], acid: 3, sweet: 1, tannin: 5 },
+{ id: 19, name: "Мамико Киндзмараули", region: "Кахетия", grape: "Саперави", abv: "11.5%", desc: "Шелковица, чернослив, шоколад. Полусладкое.", pairing: "Мясные пироги, острые блюда", image: "https://www.auchan.ru/storage/compressed/IRoP2oMLuqK9cOUq6n2ZtrzVgTme2drm4EE6yF2c.jpg", tags: ["красное", "полусладкое"], acid: 3, sweet: 4, tannin: 3 },
+{ id: 20, name: "Киндзмараули Асканели", region: "Кахетия", grape: "Саперави", abv: "12%", desc: "Интенсивное, с ежевикой и пряностями.", pairing: "Острые блюда, мясо", image: "https://winezone.ru/assets/files/images/1666865621bratyaaskanelikindzmaraulikrpslad075l125.jpg", tags: ["красное", "полусладкое"], acid: 3, sweet: 4, tannin: 3 },
+{ id: 21, name: "Мамико Алазанская Долина", region: "Кахетия", grape: "Ркацители, Мцване, Киси", abv: "12%", desc: "Ягодное, с ежевикой и сливой.", pairing: "Десерты, орехи, сыры", image: "https://static.simplewine.ru/upload/iblock/6f1/6f1af594f43f71edfc396aa949f5d5b7.png@x604?fmt=webp", tags: ["красное", "полусладкое"], acid: 3, sweet: 4, tannin: 2 },
+{ id: 22, name: "Гвариани Мукузани", region: "Кахетия", grape: "Саперави", abv: "12.5%", desc: "Гранат, дуб, специи. Выдержанное сухое.", pairing: "Дичь, сыры, шашлык", image: "https://s2.wine.style/images_gen/213/213134/0_0_991x600.webp", tags: ["красное", "сухое"], acid: 4, sweet: 1, tannin: 5 },
+{ id: 23, name: "Хванчкара Асканели", region: "Рача", grape: "Александроули, Муджуретули", abv: "12.5%", desc: "Ежевика, корица. Легендарное полусладкое.", pairing: "Острые закуски, мясо", image: "https://luding.ru/upload/iblock/5d6/avi46dgxjrjbsigvwi3a5jlkmlvm3wsa.webp", tags: ["красное", "полусладкое"], acid: 3, sweet: 4, tannin: 3 },
+{ id: 24, name: "Алазанская Долина Белое", region: "Кахетия", grape: "Ркацители", abv: "12%", desc: "Мед, абрикос. Полусладкое белое.", pairing: "Десерты, фрукты", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "полусладкое"], acid: 3, sweet: 4, tannin: 1 },
+{ id: 25, name: "Бесини Квеври Уайт", region: "Кахетия", grape: "Ркацители", abv: "12%", desc: "Оранжевое. Чайные ноты, сухофрукты.", pairing: "Овощи гриль, сыры", image: "https://images.unsplash.com/photo-1584916201218-f4242ceb4809?w=600", tags: ["оранжевое", "сухое"], acid: 3, sweet: 1, tannin: 3 },
+{ id: 26, name: "Гвариани Пиросмани", region: "Кахетия", grape: "Ркацители, Мцване", abv: "12%", desc: "Зеленое яблоко, минеральность. Свежее сухое.", pairing: "Салаты, рыба, закуски", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "сухое"], acid: 4, sweet: 1, tannin: 1 }
+]
+},
+"Испания": {
+flag: "🇪🇸",
+coords: [[41.500, 2.000], [42.200, -2.500], [42.500, -8.800], [41.400, 2.200]],
+wines: [
+{ id: 27, name: "Кава Дос Капричос", region: "Каталония", grape: "Макабео, Парельяда, Чарелло", abv: "11.5%", desc: "Брют. Дрожжевые ноты, зеленое яблоко.", pairing: "Тапас, сыры, морепродукты", image: "https://images.unsplash.com/photo-1598155523122-38423bb4d6c1?w=600", tags: ["игристое", "сухое"], acid: 4, sweet: 1, tannin: 1 },
+{ id: 28, name: "Асьеда де Аро Риоха", region: "Риоха", grape: "Темпранильо, Гарнача, Грасиано", abv: "13.5%", desc: "Ваниль, табак, ягоды. Выдержанное красное.", pairing: "Чоризо, сыры, мясо", image: "https://images.unsplash.com/photo-1559563362-c667ba5f5480?w=600", tags: ["красное", "сухое"], acid: 3, sweet: 1, tannin: 4 },
+{ id: 29, name: "Маэстра Бьенбебидо Пульпо", region: "Галисия", grape: "Альбариньо", abv: "12%", desc: "Цитрусы, морская свежесть. Минеральное белое.", pairing: "Устрицы, морепродукты", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "сухое"], acid: 5, sweet: 1, tannin: 1 },
+{ id: 30, name: "Сангре де Торо Бланко", region: "Каталония", grape: "Парельяда", abv: "11.5%", desc: "Свежесть, цитрусы. Легкое белое.", pairing: "Салаты, рыба", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "сухое"], acid: 4, sweet: 1, tannin: 1 },
+{ id: 31, name: "Сангре де Торо Тинто", region: "Каталония", grape: "Гренаш 65%, Кариньян 35%", abv: "13%", desc: "Вишня, ягоды. Яркое красное.", pairing: "Паста, мясо, тапас", image: "https://images.unsplash.com/photo-1559563362-c667ba5f5480?w=600", tags: ["красное", "сухое"], acid: 3, sweet: 1, tannin: 3 }
+]
+},
+"Аргентина": {
+flag: "🇦🇷",
+coords: [[-33.000, -68.800]],
+wines: [
+{ id: 32, name: "Демонс энд Энджелс Мальбек", region: "Мендоса", grape: "Мальбек", abv: "13.5%", desc: "Черная смородина, перец, ваниль. Плотное красное.", pairing: "Гриль, стейк, ребра", image: "https://images.unsplash.com/photo-1559563362-c667ba5f5480?w=600", tags: ["красное", "сухое"], acid: 3, sweet: 1, tannin: 4 }
+]
+},
+"Австралия": {
+flag: "🇦🇺",
+coords: [[-34.500, 138.500]],
+wines: [
+{ id: 33, name: "Олд Бин Трак Каберне", region: "Южная Австралия", grape: "Каберне Совиньон", abv: "14.5%", desc: "Черная смородина, эвкалипт. Мощное австралийское.", pairing: "Жареное мясо, стейк", image: "https://images.unsplash.com/photo-1559563362-c667ba5f5480?w=600", tags: ["красное", "сухое"], acid: 3, sweet: 1, tannin: 5 }
+]
+},
+"Чили": {
+flag: "🇨🇱",
+coords: [[-33.500, -70.700]],
+wines: [
+{ id: 34, name: "Санта Каролина Совиньон Блан", region: "Центральная долина", grape: "Совиньон Блан", abv: "12.5%", desc: "Зеленый перец, тропические фрукты. Свежее белое.", pairing: "Морепродукты, салаты", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "сухое"], acid: 4, sweet: 1, tannin: 1 }
+]
+},
+"Австрия": {
+flag: "🇦🇹",
+coords: [[48.200, 16.300]],
+wines: [
+{ id: 35, name: "Шлосс Бокфлисс Адель", region: "Нижняя Австрия", grape: "Вельшрислинг, Грюнер Вельтлинер", abv: "12.5%", desc: "Яблоко, перец. Элегантное белое.", pairing: "Суши, рыба, овощные блюда", image: "https://images.unsplash.com/photo-1572569666012-57cfd8904695?w=600", tags: ["белое", "сухое"], acid: 4, sweet: 1, tannin: 1 }
+]
+},
+"Армения": {
+flag: "🇦🇲",
+coords: [[40.100, 44.500]],
+wines: [
+{ id: 36, name: "Хоги Гранатовое", region: "Араратская долина", grape: "Гранат", abv: "12%", desc: "Яркий, с кислинкой. Плодовое полусладкое.", pairing: "Десерты, шоколад, сыры", image: "https://www.auchan.ru/f/c/insecure/w:520/plain/https://www.auchan.ru/files/original/25253936/", tags: ["плодовое", "полусладкое"], acid: 4, sweet: 4, tannin: 2 },
+{ id: 37, name: "Хоги Ежевичное", region: "Араратская долина", grape: "Ежевика", abv: "12%", desc: "Сладкое, ягодное. Насыщенный вкус.", pairing: "Шоколад, десерты, мороженое", image: "https://tsx.x5static.net/i/800x800-fit/xdelivery/files/86/e9/13ac82b7b95d8e70cee02xd58993.jpg", tags: ["плодовое", "полусладкое"], acid: 3, sweet: 5, tannin: 2 }
+]
 }
-
-// === FALLBACK ДАННЫЕ ===
-const FALLBACK_DATA = {
-    texts: {
-        1: [{ text: "🏠 СЕМЬЯ ЮЖАН\n\n18+ — это не просто число. Это эталон хинкали с 18 складками.", image: "" }],
-        2: [{ text: "🤝 СЕРВИС\n\nГость всегда прав. Даже когда не прав.", image: "" }],
-        3: [{ text: "🍳 КУХНЯ\n\nХинкали едят руками. Вилка — табу.", image: "" }],
-        4: [{ text: "🍷 БАР И ВИНО\n\nВино подбирается под блюдо, а не наоборот.", image: "" }]
-    },
-    questions: {
-        1: [{ question: "Почему 18+?", options: ["Это цензура", "Эталон хинкали", "Просто красивое число"], correct: 1, explanation: "Эталон хинкали — 18 складок" }],
-        2: [{ question: "Гость всегда прав?", options: ["Да", "Нет", "Иногда"], correct: 0, explanation: "Даже когда не прав!" }],
-        3: [{ question: "Чем едят хинкали?", options: ["Вилкой", "Ножом", "Руками"], correct: 2, explanation: "Только руками!" }],
-        4: [{ question: "Как подбирают вино?", options: ["Под блюдо", "Случайно", "По цене"], correct: 0, explanation: "Вино под блюдо!" }]
-    },
-    menu: { "хинкали": "🥟 18 складок, едят руками", "хачапури": "🧀 Сыр, тесто, любовь" },
-    wine: { "стейк": "🍷 Красное сухое", "рыба": "🥂 Белое сухое" },
-    allergens: { "орехи": "⚠️ Содержит орехи", "глютен": "⚠️ Содержит глютен" }
 };
-
-// === ГЛОБАЛЬНЫЕ ДАННЫЕ ===
-let appData = { texts: {}, questions: {}, menu: {}, wine: {}, allergens: {} };
-let userProgress = {
-    currentBlock: 1,
-    currentStep: 'text',
-    textIndex: 0,
-    testScores: {},
-    passedBlocks: [],
-    blocksLocked: {},
-    testHistory: {}
-};
-let currentLesson = { block: 1, index: 0 };
-let currentTest = { block: 1, questionIndex: 0, answers: [] };
-let currentRefType = 'menu';
-
-// === ЗАГРУЗКА ДАННЫХ ===
-async function fetchSheet(sheetName, timeout = 10000) {
-    const url = GVIZ_URL.replace('{sheet_id}', SHEET_ID).replace('{sheet_name}', sheetName);
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    
-    try {
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(id);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const text = await response.text();
-        return parseCSV(text);
-    } catch (e) {
-        console.warn(`Failed to load ${sheetName}:`, e.message);
-        return null;
-    }
-}
-
-async function loadAllData() {
-    const [textsRows, questionsRows, menuRows, wineRows, allergensRows] = await Promise.all([
-        fetchSheet('Texts'),
-        fetchSheet('Questions'),
-        fetchSheet('Menu'),
-        fetchSheet('Wine'),
-        fetchSheet('Allergens')
-    ]);
-    
-    let loaded = false;
-    
-    // Texts
-    if (textsRows && textsRows.length > 0) {
-        loaded = true;
-        textsRows.forEach(row => {
-            const ch = parseInt(row.chapter) || 1;
-            if (ch >= 1 && ch <= 4) {
-                if (!appData.texts[ch]) appData.texts[ch] = [];
-                appData.texts[ch].push({
-                    text: row.text || '',
-                    image: row.image || ''
-                });
-            }
-        });
-    }
-    
-    // Questions
-    if (questionsRows && questionsRows.length > 0) {
-        loaded = true;
-        questionsRows.forEach(row => {
-            const ch = parseInt(row.chapter) || 1;
-            if (ch >= 1 && ch <= 4) {
-                const options = [];
-                for (let i = 1; i <= 10; i++) {
-                    const opt = row[`option_${i}`] || row[String.fromCharCode(64 + i).toLowerCase()];
-                    if (opt) options.push(opt);
-                }
-                let correct = parseInt(row.correct) || 0;
-                if (isNaN(correct) && row.correct) {
-                    correct = row.correct.toUpperCase().charCodeAt(0) - 65;
-                }
-                if (!appData.questions[ch]) appData.questions[ch] = [];
-                appData.questions[ch].push({
-                    question: row.question || '',
-                    options,
-                    correct,
-                    explanation: row.explanation || ''
-                });
-            }
-        });
-    }
-    
-    // References
-    if (menuRows && menuRows.length > 0) {
-        loaded = true;
-        menuRows.forEach(r => { 
-            const key = (r.key || '').toLowerCase().trim();
-            const val = r.value || '';
-            if (key && val) appData.menu[key] = val; 
-        });
-    }
-    if (wineRows && wineRows.length > 0) {
-        loaded = true;
-        wineRows.forEach(r => { 
-            const key = (r.key || '').toLowerCase().trim();
-            const val = r.value || '';
-            if (key && val) appData.wine[key] = val; 
-        });
-    }
-    if (allergensRows && allergensRows.length > 0) {
-        loaded = true;
-        allergensRows.forEach(r => { 
-            const key = (r.key || '').toLowerCase().trim();
-            const val = r.value || '';
-            if (key && val) appData.allergens[key] = val; 
-        });
-    }
-    
-    // Fallback если пусто
-    if (!loaded) {
-        console.warn('Using fallback data');
-        appData = JSON.parse(JSON.stringify(FALLBACK_DATA));
-        document.getElementById('loadingError').innerHTML = '⚠️ Google Sheets недоступны<br>Используются тестовые данные';
-    } else {
-        // Merge с fallback для пустых блоков
-        for (let ch = 1; ch <= 4; ch++) {
-            if (!appData.texts[ch] || appData.texts[ch].length === 0) {
-                appData.texts[ch] = FALLBACK_DATA.texts[ch] || [];
-            }
-            if (!appData.questions[ch] || appData.questions[ch].length === 0) {
-                appData.questions[ch] = FALLBACK_DATA.questions[ch] || [];
-            }
-        }
-    }
-    
-    console.log('Data loaded:', {
-        texts: Object.keys(appData.texts).map(k => `${k}:${appData.texts[k].length}`),
-        questions: Object.keys(appData.questions).map(k => `${k}:${appData.questions[k].length}`),
-        menu: Object.keys(appData.menu).length,
-        wine: Object.keys(appData.wine).length,
-        allergens: Object.keys(appData.allergens).length
-    });
-}
-
-// === ПРОГРЕСС ===
-function loadProgress() {
-    const saved = localStorage.getItem('ujzhan_progress');
-    if (saved) {
-        userProgress = { ...userProgress, ...JSON.parse(saved) };
-    }
-    const user = tg.initDataUnsafe?.user;
-    if (user) {
-        document.getElementById('profileName').textContent = user.first_name + (user.last_name ? ' ' + user.last_name : '');
-        document.getElementById('profileId').textContent = `ID: ${user.id}`;
-    }
-}
-
-function saveProgress() {
-    localStorage.setItem('ujzhan_progress', JSON.stringify(userProgress));
-}
-
-function getProgressPercent() {
-    const passed = userProgress.passedBlocks.length;
-    return Math.round((passed / 4) * 100);
-}
-
-function updateProgressUI() {
-    const percent = getProgressPercent();
-    document.getElementById('progressPercent').textContent = `${percent}%`;
-    document.getElementById('progressBar').style.width = `${percent}%`;
-    document.getElementById('statCompleted').textContent = userProgress.passedBlocks.length;
-    document.getElementById('statTests').textContent = Object.keys(userProgress.testScores).length;
-    
-    const scores = Object.values(userProgress.testScores);
-    const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-    document.getElementById('statScore').textContent = `${avgScore}%`;
-    
-    renderChapters();
-    renderBlockStats();
-}
-
-// === РЕНДЕРИНГ ===
-function renderChapters() {
-    const grid = document.getElementById('chaptersGrid');
-    const chapters = [
-        { num: 1, title: 'Легенды Южан', icon: '🏠', desc: 'История и философия' },
-        { num: 2, title: 'Сервис', icon: '🤝', desc: 'Стандарты обслуживания' },
-        { num: 3, title: 'Кухня', icon: '🍳', desc: 'Меню и блюда' },
-        { num: 4, title: 'Бар и вино', icon: '🍷', desc: 'Винная карта' }
-    ];
-    
-    grid.innerHTML = chapters.map(ch => {
-        const isPassed = userProgress.passedBlocks.includes(`chapter_${ch.num}`);
-        const isLocked = ch.num > userProgress.currentBlock;
-        const isCurrent = ch.num === userProgress.currentBlock;
-        
-        let statusClass = 'status-lock';
-        let statusText = '🔒 Заблокировано';
-        if (isPassed) { statusClass = 'status-done'; statusText = '✅ Пройдено'; }
-        else if (isCurrent) { statusClass = 'status-current'; statusText = '📖 В процессе'; }
-        
-        const cardClass = `chapter-card ${isLocked ? 'locked' : ''} ${isPassed ? 'completed' : ''} ${isCurrent ? 'current' : ''}`;
-        
-        return `
-        <div class="${cardClass}" onclick="openChapter(${ch.num})">
-            <div class="chapter-icon">${ch.icon}</div>
-            <div class="chapter-info">
-                <div class="chapter-title">Блок ${ch.num}: ${ch.title}</div>
-                <div class="chapter-desc">${ch.desc}</div>
-            </div>
-            <div class="chapter-status ${statusClass}">${statusText}</div>
-        </div>
-        `;
-    }).join('');
-}
-
-function renderBlockStats() {
-    const container = document.getElementById('blockStats');
-    const chapters = [
-        { num: 1, title: 'Легенды Южан' },
-        { num: 2, title: 'Сервис' },
-        { num: 3, title: 'Кухня' },
-        { num: 4, title: 'Бар и вино' }
-    ];
-    
-    container.innerHTML = chapters.map(ch => {
-        const score = userProgress.testScores[`chapter_${ch.num}`] || 0;
-        const total = appData.questions[ch.num]?.length || 0;
-        const history = userProgress.testHistory[`chapter_${ch.num}`] || [];
-        const attempts = history.length;
-        
-        return `
-        <div class="ref-item">
-            <div class="ref-item-key">Блок ${ch.num}: ${ch.title}</div>
-            <div class="ref-item-value">
-                Результат: ${score}/${total} (${Math.round((score/total)*100) || 0}%)<br>
-                Попыток: ${attempts}
-            </div>
-        </div>
-        `;
-    }).join('');
-}
-
-function renderReferences(query = '') {
-    const container = document.getElementById('refResults');
-    const data = appData[currentRefType] || {};
-    const entries = Object.entries(data).filter(([key]) => 
-        !query || key.includes(query.toLowerCase())
-    );
-    
-    if (entries.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-sec);">Ничего не найдено</div>';
-        return;
-    }
-    
-    container.innerHTML = entries.slice(0, 50).map(([key, value]) => `
-    <div class="ref-item">
-        <div class="ref-item-key">${key}</div>
-        <div class="ref-item-value">${value}</div>
-    </div>
-    `).join('');
-}
-
-// === НАВИГАЦИЯ ===
-function switchScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
-    document.querySelector(`.nav-item[data-screen="${screenId}"]`)?.classList.add('active');
-}
-
-document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-        switchScreen(item.dataset.screen);
-    });
-});
-
-// === УРОКИ ===
-function openChapter(blockNum) {
-    if (blockNum > userProgress.currentBlock) return;
-    currentLesson = { block: blockNum, index: 0 };
-    userProgress.currentBlock = blockNum;
-    userProgress.currentStep = 'text';
-    userProgress.textIndex = 0;
-    saveProgress();
-    showLesson();
-}
-
-function showLesson() {
-    const view = document.getElementById('lessonView');
-    const content = document.getElementById('lessonContent');
-    const title = document.getElementById('lessonTitle');
-    const texts = appData.texts[currentLesson.block] || [];
-    const item = texts[currentLesson.index];
-    
-    if (!item) {
-        startTest();
-        return;
-    }
-    
-    title.textContent = `Блок ${currentLesson.block} • ${currentLesson.index + 1}/${texts.length}`;
-    
-    let html = '';
-    if (item.image && item.image.startsWith('http')) {
-        html += `<img src="${item.image}" class="lesson-image" alt="Lesson image">`;
-    }
-    html += `<div class="lesson-text">${item.text.replace(/\n/g, '<br>')}</div>`;
-    
-    const isLast = currentLesson.index >= texts.length - 1;
-    html += `
-    <div class="lesson-nav">
-        ${currentLesson.index > 0 ? '<button class="lesson-btn btn-secondary" onclick="prevLesson()">← Назад</button>' : ''}
-        <button class="lesson-btn btn-primary" onclick="${isLast ? 'startTest()' : 'nextLesson()'}">
-            ${isLast ? '📋 К тесту' : 'Дальше →'}
-        </button>
-    </div>
-    `;
-    
-    content.innerHTML = html;
-    view.classList.add('active');
-}
-
-function nextLesson() {
-    currentLesson.index++;
-    userProgress.textIndex = currentLesson.index;
-    saveProgress();
-    showLesson();
-}
-
-function prevLesson() {
-    if (currentLesson.index > 0) {
-        currentLesson.index--;
-        userProgress.textIndex = currentLesson.index;
-        saveProgress();
-        showLesson();
-    }
-}
-
-function closeLesson() {
-    document.getElementById('lessonView').classList.remove('active');
-}
-
-document.getElementById('lessonBack').addEventListener('click', closeLesson);
-
-// === ТЕСТЫ ===
-function startTest() {
-    currentTest = {
-        block: currentLesson.block,
-        questionIndex: 0,
-        answers: []
-    };
-    showTestQuestion();
-    document.getElementById('lessonView').classList.remove('active');
-    document.getElementById('testView').classList.add('active');
-}
-
-function showTestQuestion() {
-    const questions = appData.questions[currentTest.block] || [];
-    if (currentTest.questionIndex >= questions.length) {
-        finishTest();
-        return;
-    }
-    
-    const q = questions[currentTest.questionIndex];
-    const progress = ((currentTest.questionIndex) / questions.length) * 100;
-    
-    document.getElementById('testProgress').textContent = `${currentTest.questionIndex + 1}/${questions.length}`;
-    document.getElementById('testProgressBar').style.width = `${progress}%`;
-    document.getElementById('testQuestion').textContent = `❓ ${q.question}`;
-    
-    const optionsHtml = q.options.map((opt, i) => `
-    <div class="test-option" onclick="selectAnswer(${i})">
-        ${String.fromCharCode(65 + i)}) ${opt}
-    </div>
-    `).join('');
-    
-    document.getElementById('testOptions').innerHTML = optionsHtml;
-    document.getElementById('testFeedback').classList.remove('show');
-    document.getElementById('testNext').style.display = 'none';
-}
-
-function selectAnswer(index) {
-    const questions = appData.questions[currentTest.block] || [];
-    const q = questions[currentTest.questionIndex];
-    const options = document.querySelectorAll('.test-option');
-    
-    options.forEach((opt, i) => {
-        opt.classList.remove('selected', 'correct', 'wrong');
-        if (i === index) opt.classList.add('selected');
-        if (i === q.correct) opt.classList.add('correct');
-        if (i === index && i !== q.correct) opt.classList.add('wrong');
-    });
-    
-    const isCorrect = index === q.correct;
-    currentTest.answers.push({ questionIndex: currentTest.questionIndex, correct: isCorrect });
-    
-    const feedback = document.getElementById('testFeedback');
-    document.getElementById('feedbackTitle').textContent = isCorrect ? '✅ Правильно!' : '❌ Ошибка';
-    document.getElementById('feedbackText').textContent = q.explanation;
-    feedback.classList.add('show');
-    
-    document.getElementById('testNext').style.display = 'block';
-}
-
-document.getElementById('testNext').addEventListener('click', () => {
-    currentTest.questionIndex++;
-    showTestQuestion();
-});
-
-function finishTest() {
-    const questions = appData.questions[currentTest.block] || [];
-    const correct = currentTest.answers.filter(a => a.correct).length;
-    const total = questions.length;
-    const score = Math.round((correct / total) * 100);
-    const passed = score >= 80;
-    
-    userProgress.testScores[`chapter_${currentTest.block}`] = correct;
-    
-    if (!userProgress.testHistory[`chapter_${currentTest.block}`]) {
-        userProgress.testHistory[`chapter_${currentTest.block}`] = [];
-    }
-    userProgress.testHistory[`chapter_${currentTest.block}`].push({
-        timestamp: new Date().toISOString(),
-        score: correct,
-        total,
-        passed
-    });
-    
-    if (passed) {
-        if (!userProgress.passedBlocks.includes(`chapter_${currentTest.block}`)) {
-            userProgress.passedBlocks.push(`chapter_${currentTest.block}`);
-        }
-        if (currentTest.block === userProgress.currentBlock && currentTest.block < 4) {
-            userProgress.currentBlock++;
-        }
-    }
-    
-    saveProgress();
-    updateProgressUI();
-    
-    document.getElementById('testView').classList.remove('active');
-    
-    const resultMsg = passed 
-        ? `🎉 Блок ${currentTest.block} пройден! ${correct}/${total}`
-        : `❌ Не пройдено. Нужно 80%. Ваш результат: ${correct}/${total}`;
-    
-    tg.showAlert(resultMsg);
-}
-
-document.getElementById('testBack').addEventListener('click', () => {
-    document.getElementById('testView').classList.remove('active');
-});
-
-// === СПРАВОЧНИКИ ===
-document.querySelectorAll('.ref-card').forEach(card => {
-    card.addEventListener('click', () => {
-        currentRefType = card.dataset.type;
-        document.getElementById('refResultsTitle').innerHTML = `<i class="fas fa-list"></i> ${card.querySelector('.ref-title').textContent}`;
-        renderReferences();
-    });
-});
-
-document.getElementById('refSearch').addEventListener('input', (e) => {
-    renderReferences(e.target.value);
-});
-
-// === ТЕМА ===
-const themeBtn = document.getElementById('themeToggle');
-themeBtn.addEventListener('click', () => {
-    const body = document.body;
-    const isDark = body.getAttribute('data-theme') === 'dark';
-    const icon = themeBtn.querySelector('i');
-    if (isDark) {
-        body.removeAttribute('data-theme');
-        icon.className = 'fas fa-moon';
-    } else {
-        body.setAttribute('data-theme', 'dark');
-        icon.className = 'fas fa-sun';
-    }
-});
-
-// === СБРОС ПРОГРЕССА ===
-document.getElementById('resetProgress').addEventListener('click', () => {
-    tg.showConfirm('Сбросить весь прогресс?', (confirmed) => {
-        if (confirmed) {
-            userProgress = {
-                currentBlock: 1,
-                currentStep: 'text',
-                textIndex: 0,
-                testScores: {},
-                passedBlocks: [],
-                blocksLocked: {},
-                testHistory: {}
-            };
-            saveProgress();
-            updateProgressUI();
-            tg.showAlert('Прогресс сброшен!');
-        }
-    });
-});
 
 // === ИНИЦИАЛИЗАЦИЯ ===
-async function init() {
-    loadProgress();
-    
-    try {
-        await loadAllData();
-    } catch (e) {
-        console.error('Init error:', e);
-        appData = JSON.parse(JSON.stringify(FALLBACK_DATA));
-        document.getElementById('loadingError').innerHTML = '⚠️ Ошибка загрузки<br>Используются тестовые данные';
-    }
-    
-    updateProgressUI();
-    renderReferences();
-    
-    // Сертификат при полном прохождении
-    if (userProgress.passedBlocks.length === 4) {
-        document.getElementById('certificateContainer').innerHTML = `
-        <div class="certificate">
-            <div class="certificate-title">🏆 СЕРТИФИКАТ ЮЖАНИНА</div>
-            <div>Выдан: ${new Date().toLocaleDateString('ru-RU')}</div>
-            <div class="certificate-date">✅ Все 4 блока пройдены</div>
-        </div>
-        `;
-    }
-    
-    setTimeout(() => {
-        document.getElementById('loading').classList.add('hidden');
-    }, 1000);
+let map;
+let countryLayers = {};
+let allWines = [];
+let currentFilter = 'all';
+let lastSelectedCountry = null;
+let isSearchActive = false;
+
+// Собираем все вина
+for (const country in wineDatabase) {
+wineDatabase[country].wines.forEach(wine => {
+wine.country = country;
+allWines.push(wine);
+});
 }
 
-init();
-</script>
+function initMap() {
+map = L.map('map', {
+zoomControl: false,
+attributionControl: false,
+minZoom: 2,
+maxZoom: 10,
+maxBounds: [[-60, -180], [80, 180]],
+maxBoundsViscosity: 1.0
+}).setView([45.0, 35.0], 3);
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+const isDark = document.body.getAttribute('data-theme') === 'dark';
+const tileUrl = isDark
+? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+L.tileLayer(tileUrl, {
+attribution: '© OpenStreetMap © CARTO',
+subdomains: 'abcd',
+maxZoom: 19
+}).addTo(map);
+
+// Загружаем GeoJSON для стран
+fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
+.then(response => response.json())
+.then(data => {
+const countryNames = {
+'Russia': 'Россия',
+'Italy': 'Италия',
+'Germany': 'Германия',
+'Georgia': 'Грузия',
+'Spain': 'Испания',
+'Argentina': 'Аргентина',
+'Australia': 'Австралия',
+'Chile': 'Чили',
+'Austria': 'Австрия',
+'Armenia': 'Армения'
+};
+L.geoJSON(data, {
+style: (feature) => {
+const countryName = countryNames[feature.properties.name];
+const hasWines = wineDatabase[countryName];
+return {
+color: hasWines ? '#722F37' : '#ccc',
+weight: 1,
+opacity: 0.6,
+fillOpacity: hasWines ? 0.3 : 0.1,
+fillColor: hasWines ? '#722F37' : '#999'
+};
+},
+onEachFeature: (feature, layer) => {
+const countryName = countryNames[feature.properties.name];
+if (wineDatabase[countryName]) {
+layer.on('click', () => {
+if(!isSearchActive) {
+lastSelectedCountry = countryName;
+openCountrySheet(countryName);
+}
+});
+layer.on('mouseover', () => {
+layer.setStyle({ fillOpacity: 0.5, weight: 2 });
+});
+layer.on('mouseout', () => {
+layer.setStyle({ fillOpacity: 0.3, weight: 1 });
+});
+countryLayers[countryName] = layer;
+}
+}
+}).addTo(map);
+
+// Скрываем загрузку
+setTimeout(() => {
+document.getElementById('loading').classList.add('hidden');
+showHint();
+}, 1500);
+})
+.catch(err => {
+console.log('GeoJSON не загрузился:', err);
+document.getElementById('loading').classList.add('hidden');
