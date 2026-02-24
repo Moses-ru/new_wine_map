@@ -405,7 +405,7 @@ transition: opacity 0.5s ease;
 <header>
 <div class="logo">
 <img src="https://static.tildacdn.com/tild6435-3530-4633-a232-383431366539/Vector.svg" alt="Logo" class="logo-img">
-<span></span>
+<span>Винная Карта ЮГ</span>
 </div>
 <div class="search-container">
 <i class="fas fa-search search-icon"></i>
@@ -537,13 +537,7 @@ transition: opacity 0.5s ease;
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-
-const tg = window.Telegram.WebApp;
-tg.ready();
-tg.expand();
-
 // === БАЗА ДАННЫХ ===
 const wineDatabase = {
 "Россия": {
@@ -741,3 +735,226 @@ showHint();
 .catch(err => {
 console.log('GeoJSON не загрузился:', err);
 document.getElementById('loading').classList.add('hidden');
+});
+}
+
+function showHint() {
+const hint = document.getElementById('countryHint');
+hint.classList.add('show');
+setTimeout(() => hint.classList.remove('show'), 3000);
+}
+
+function openCountrySheet(country) {
+isSearchActive = false;
+const data = wineDatabase[country];
+const sheet = document.getElementById('bottomSheet');
+document.getElementById('sheetCountryFlag').textContent = data.flag;
+document.getElementById('sheetCountryName').textContent = country;
+document.getElementById('searchInput').value = '';
+
+renderWines(data.wines);
+sheet.classList.add('active');
+}
+
+function renderWines(wines, title = null, flag = null) {
+const sheet = document.getElementById('bottomSheet');
+const content = document.getElementById('sheetContent');
+const countEl = document.getElementById('sheetCount');
+const flagEl = document.getElementById('sheetCountryFlag');
+const nameEl = document.getElementById('sheetCountryName');
+
+if (title) {
+flagEl.textContent = flag || '🔍';
+nameEl.textContent = title;
+}
+
+const filteredWines = currentFilter === 'all'
+? wines
+: wines.filter(w => w.tags.includes(currentFilter));
+
+countEl.textContent = `${filteredWines.length} вин`;
+content.innerHTML = '';
+
+if (filteredWines.length === 0) {
+content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-sec);"><i class="fas fa-wine-glass" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.5;"></i><p>В этой категории вин нет</p></div>';
+} else {
+filteredWines.forEach(wine => {
+const card = document.createElement('div');
+card.className = 'wine-card';
+card.innerHTML = `
+<img src="${wine.image}" alt="${wine.name}" loading="lazy">
+<div class="wine-card-info">
+<h3>${wine.name}</h3>
+<p>${wine.region}</p>
+<div class="wine-tags">
+${wine.tags.slice(0, 2).map(tag => `<span class="wine-tag">${tag}</span>`).join('')}
+</div>
+</div>
+`;
+card.onclick = () => openDetail(wine);
+content.appendChild(card);
+});
+}
+sheet.classList.add('active');
+}
+
+function performSearch(query) {
+if (!query || query.length === 0) {
+isSearchActive = false;
+if (lastSelectedCountry) {
+openCountrySheet(lastSelectedCountry);
+} else {
+document.getElementById('bottomSheet').classList.remove('active');
+}
+return;
+}
+
+isSearchActive = true;
+const lowerQuery = query.toLowerCase();
+const results = allWines.filter(w => 
+w.name.toLowerCase().includes(lowerQuery) || 
+w.grape.toLowerCase().includes(lowerQuery) ||
+w.region.toLowerCase().includes(lowerQuery) ||
+w.tags.some(tag => tag.includes(lowerQuery)) // Поиск по тегам
+);
+
+renderWines(results, `Поиск: ${query}`, '🔍');
+}
+
+function closeSheet() {
+document.getElementById('bottomSheet').classList.remove('active');
+if(isSearchActive) {
+document.getElementById('searchInput').value = '';
+isSearchActive = false;
+}
+}
+
+function openDetail(wine) {
+const modal = document.getElementById('detailModal');
+document.getElementById('detailImg').src = wine.image;
+document.getElementById('detailTitle').textContent = wine.name;
+document.getElementById('detailRegion').innerHTML = `<i class="fas fa-map-marker-alt"></i> ${wine.country}, ${wine.region}`;
+document.getElementById('detailGrape').textContent = wine.grape;
+document.getElementById('detailAbv').textContent = wine.abv;
+document.getElementById('detailDesc').textContent = wine.desc;
+document.getElementById('detailPairing').textContent = wine.pairing;
+
+// Определение типа вина для отображения
+const typeTag = wine.tags.find(t => ['сухое', 'полусухое', 'полусладкое', 'сладкое'].includes(t));
+const typeLabel = typeTag ? typeTag.charAt(0).toUpperCase() + typeTag.slice(1) : 'Не указано';
+document.getElementById('detailType').textContent = typeLabel;
+
+setTimeout(() => {
+document.getElementById('barAcid').style.width = (wine.acid * 20) + '%';
+document.getElementById('barSweet').style.width = (wine.sweet * 20) + '%';
+document.getElementById('barTannin').style.width = (wine.tannin * 20) + '%';
+document.getElementById('valAcid').textContent = wine.acid + '/5';
+document.getElementById('valSweet').textContent = wine.sweet + '/5';
+document.getElementById('valTannin').textContent = wine.tannin + '/5';
+}, 300);
+const shareText = `${wine.name} из ${wine.country}`;
+const url = window.location.href;
+document.getElementById('shareTg').onclick = () => {
+window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`, '_blank');
+};
+document.getElementById('shareWa').onclick = () => {
+window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + ' ' + url)}`, '_blank');
+};
+document.getElementById('shareVk').onclick = () => {
+window.open(`https://vk.com/share.php?title=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`, '_blank');
+};
+modal.classList.add('active');
+}
+
+function closeDetail() {
+document.getElementById('detailModal').classList.remove('active');
+}
+
+// Фильтры
+document.querySelectorAll('.filter-chip').forEach(chip => {
+chip.addEventListener('click', () => {
+document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+chip.classList.add('active');
+currentFilter = chip.dataset.filter;
+const sheet = document.getElementById('bottomSheet');
+if (sheet.classList.contains('active')) {
+if (isSearchActive) {
+performSearch(document.getElementById('searchInput').value);
+} else if (lastSelectedCountry) {
+openCountrySheet(lastSelectedCountry);
+}
+}
+});
+});
+
+// Поиск
+document.getElementById('searchInput').addEventListener('input', (e) => {
+performSearch(e.target.value);
+});
+
+// Тема
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.addEventListener('click', () => {
+const body = document.body;
+const isDark = body.getAttribute('data-theme') === 'dark';
+const icon = themeBtn.querySelector('i');
+if (isDark) {
+body.removeAttribute('data-theme');
+icon.className = 'fas fa-moon';
+map.eachLayer((layer) => {
+if (layer._url) {
+layer.setUrl('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png');
+}
+if (layer.setStyle) {
+layer.setStyle({ color: '#722F37', fillColor: '#722F37' });
+}
+});
+} else {
+body.setAttribute('data-theme', 'dark');
+icon.className = 'fas fa-sun';
+map.eachLayer((layer) => {
+if (layer._url) {
+layer.setUrl('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
+}
+if (layer.setStyle) {
+layer.setStyle({ color: '#9e4650', fillColor: '#9e4650' });
+}
+});
+}
+});
+
+// Закрытие bottom sheet
+document.getElementById('sheetClose').addEventListener('click', closeSheet);
+
+// Улучшенный Drag-n-Drop только для ручки
+const handle = document.getElementById('sheetHandle');
+let touchStartY = 0;
+let touchCurrentY = 0;
+
+handle.addEventListener('touchstart', (e) => {
+touchStartY = e.touches[0].clientY;
+}, {passive: true});
+
+handle.addEventListener('touchmove', (e) => {
+touchCurrentY = e.touches[0].clientY;
+}, {passive: true});
+
+handle.addEventListener('touchend', () => {
+const diff = touchCurrentY - touchStartY;
+// Если потянули вниз больше чем на 100px - закрываем
+if (diff > 100) {
+closeSheet();
+}
+// Сброс
+touchStartY = 0;
+touchCurrentY = 0;
+});
+
+// Закрытие detail modal
+document.getElementById('detailBack').addEventListener('click', closeDetail);
+
+// Инициализация
+initMap();
+</script>
+</body>
+</html>
